@@ -179,8 +179,8 @@ class BaseIntrospector(object):
         self._factory_class = factory_class
         self._model = self._factory_class._meta.model
 
-    def get_field_names(self, model):
-        """Fetch all "auto-declarable" field names from a model."""
+    def get_default_field_names(self, model):
+        """Fetch default "auto-declarable" field names from a model."""
         raise NotImplementedError("Introspector %r doesn't know how to extract fields from %s" % (self, model))
 
     def get_field_by_name(self, model, field_name):
@@ -204,22 +204,16 @@ class BaseIntrospector(object):
         builder = self.builders[field.__class__]
         return builder(field_ctxt)
 
-    def build_declarations(self, for_fields, skip_fields=()):
+    def build_declarations(self, for_fields, skip_fields):
         """Build declarations for a set of fields.
 
         Args:
-            for_fields (str iterable): list of fields to build (can be '*' to build all fields)
+            for_fields (str iterable): list of fields to build
             skip_fields (str iterable): list of fields that should *NOT* be built.
 
         Returns:
             (str, factory.Declaration) list: the new declarations.
         """
-        if '*' in for_fields:
-            if len(for_fields) != 1:
-                raise ValueError("If %s._meta.auto_fields contains '*', it cannot contain other values; found %r."
-                    % (for_fields, self._factory_class))
-            for_fields = self.get_field_names(self._model)
-
         declarations = {}
         for field_name in for_fields:
             if field_name in skip_fields:
@@ -305,8 +299,12 @@ class FactoryOptions:
             # The introspector class to use; if None (the default),
             # uses self.DEFAULT_INTROSPECTOR_CLASS
             OptionDefault('introspector_class', None, inherit=True),
-            # The list of fields to auto-generate
-            OptionDefault('auto_fields', (), inherit=False),
+            # Whether to auto-generate the default set of fields
+            OptionDefault('default_auto_fields', False, inherit=True),
+            # List of fields to include in auto-generation
+            OptionDefault('include_auto_fields', (), inherit=False),
+            # List of fields to exclude from auto-generation
+            OptionDefault('exclude_auto_fields', (), inherit=False),
         ]
 
     def _fill_from_meta(self, meta, base_meta):
@@ -361,16 +359,28 @@ class FactoryOptions:
             self.base_declarations.update(parent._meta.base_declarations)
             self.parameters.update(parent._meta.parameters)
 
-        raw_declarations = dict(vars(self.factory))
-        auto_declarations = self.introspector.build_declarations(
-            for_fields=self.auto_fields,
-            skip_fields=raw_declarations.keys(),
-        )
-        raw_declarations.update(auto_declarations)
-
-        for k, v in raw_declarations.items():
+        for k, v in vars(self.factory).items():
             if self._is_declaration(k, v):
                 self.base_declarations[k] = v
+
+        if not self.abstract and (self.default_auto_fields or self.include_auto_fields):
+            if self.default_auto_fields:
+                field_names = set(self.introspector.get_default_field_names(self.model))
+            else:
+                field_names = set()
+            field_names.update(self.include_auto_fields)
+
+            exclude_auto_fields = set(self.base_declarations.keys())
+            exclude_auto_fields.update(self.exclude_auto_fields)
+            field_names.difference_update(exclude_auto_fields)
+
+            auto_declarations = self.introspector.build_declarations(field_names, exclude_auto_fields)
+
+            for field_name, auto_declaration in auto_declarations.items():
+                if field_name not in field_names:
+                    raise ValueError('Introspector %s returned a field (%s) that it was not asked for'
+                        % (self.introspector.__class__.__name__, field_name))
+                self.base_declarations[field_name] = auto_declaration
 
         if params is not None:
             for k, v in utils.sort_ordered_objects(vars(params).items(), getter=lambda item: item[1]):
@@ -774,7 +784,13 @@ class BaseFactory:
         return cls.generate_batch(strategy, size, **kwargs)
 
     @classmethod
-    def auto_factory(cls, target_model, for_fields=('*',), **field_overrides):
+    def auto_factory(
+            cls,
+            model,
+            default_auto_fields=True,
+            include_auto_fields=(),
+            exclude_auto_fields=(),
+            **field_overrides):
         """Introspect the target_model and build a factory for it.
 
         Args:
@@ -787,9 +803,18 @@ class BaseFactory:
             Factory subclass: the generated factory
         """
         factory_name = '%sAutoFactory' % target_model.__name__
+
+        # work around variable shadowing
+        _model = model
+        _default_auto_fields = default_auto_fields
+        _include_auto_fields = include_auto_fields
+        _exclude_auto_fields = exclude_auto_fields
+
         class Meta:
-            model = target_model
-            auto_fields = for_fields
+            model = _model
+            default_auto_fields = _default_auto_fields
+            include_auto_fields = _include_auto_fields
+            exclude_auto_fields = _exclude_auto_fields
         attrs = {}
         attrs.update(field_overrides)
         attrs['Meta'] = Meta
