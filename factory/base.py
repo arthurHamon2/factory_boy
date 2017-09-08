@@ -156,7 +156,9 @@ class OptionDefault:
         return result
 
 
-FieldContext = collections.namedtuple('FieldContext',
+
+FieldContext = collections.namedtuple(
+    'FieldContext',
     ['field', 'field_name', 'model', 'factory', 'skips'])
 
 
@@ -185,7 +187,8 @@ class BaseIntrospector(object):
 
     def get_field_by_name(self, model, field_name):
         """Get the actual "field descriptor" for a given field name"""
-        raise NotImplementedError("Introspector %r doesn't know how to fetch field %s from %r"
+        raise NotImplementedError(
+            "Introspector %r doesn't know how to fetch field %s from %r"
             % (self._factory_class, field_name, model))
 
     def build_declaration(self, field_ctxt):
@@ -199,8 +202,8 @@ class BaseIntrospector(object):
         field = field_ctxt.field
         if field.__class__ not in self.builders:
             raise NotImplementedError(
-                    "Introspector %r lacks recipe for building field %r; add it to %s.Meta.auto_fields_rules."
-                    % (self, field, self._factory_class.__name__))
+                "Introspector %r lacks recipe for building field %r; add it to %s.Meta.auto_fields_rules."
+                % (self, field, self._factory_class.__name__))
         builder = self.builders[field.__class__]
         return builder(field_ctxt)
 
@@ -378,7 +381,8 @@ class FactoryOptions:
 
             for field_name, auto_declaration in auto_declarations.items():
                 if field_name not in field_names:
-                    raise ValueError('Introspector %s returned a field (%s) that it was not asked for'
+                    raise ValueError(
+                        'Introspector %s returned a field (%s) that it was not asked for'
                         % (self.introspector.__class__.__name__, field_name))
                 self.base_declarations[field_name] = auto_declaration
 
