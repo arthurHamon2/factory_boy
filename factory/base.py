@@ -807,6 +807,7 @@ class BaseFactory:
             default_auto_fields=True,
             include_auto_fields=(),
             exclude_auto_fields=(),
+            introspector_class=None,
             **field_overrides):
         """Introspect the target_model and build a factory for it.
 
@@ -826,12 +827,15 @@ class BaseFactory:
         _default_auto_fields = default_auto_fields
         _include_auto_fields = include_auto_fields
         _exclude_auto_fields = exclude_auto_fields
+        _introspector_class = introspector_class
 
         class Meta:
             model = _model
             default_auto_fields = _default_auto_fields
             include_auto_fields = _include_auto_fields
             exclude_auto_fields = _exclude_auto_fields
+            if _introspector_class:
+                introspector_class = _introspector_class
         attrs = {}
         attrs.update(field_overrides)
         attrs['Meta'] = Meta
