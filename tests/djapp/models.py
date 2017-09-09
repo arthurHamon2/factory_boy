@@ -139,15 +139,13 @@ class MultiFieldModel(models.Model):
     binary = models.BinaryField()
     boolean = models.BooleanField(default=False)
     nullboolean = models.NullBooleanField()
-    if django.VERSION[:2] >= (1, 8):
-        uuid = models.UUIDField()
+    uuid = models.UUIDField()
 
     # Date and time
     date = models.DateField()
     datetime = models.DateTimeField()
     time = models.TimeField()
-    if django.VERSION[:2] >= (1, 8):
-        duration = models.DurationField()
+    duration = models.DurationField()
 
     # Numbers
     int = models.IntegerField()
